@@ -188,15 +188,18 @@ OperHex:
 
 
 PrintHex:
+    newstr
     beqz a0, .printZeroHex
     mv a1, a0
-    newstr
 
     push2  ra, s0
     push2 s1, s2
 
     li s0, 32            # counter
-    li s1, 0xf0000000   # mask
+    li s1, 0xf0000000    # mask
+
+    and s2, a1, s1
+    bnez s2, .while_print_hex
 
     .cycle:  # clipping non-essential zeros
         srli s1, s1,  4
