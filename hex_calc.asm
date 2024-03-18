@@ -8,14 +8,29 @@
     syscall 93
 .end_macro
 
+.macro printch
+    syscall 11
+.end_macro
+
+.macro readch
+    syscall 12
+.end_macro
+
+.macro newstr # Print char \n. Using s1 and a0 registers.
+    push a0
+    li a0, '\n'
+    printch
+    pop a0
+.end_macro
+
 .macro error %str
-	.data
-		str: .asciz %str
-	.text
-		call newstr
-    	la a0, str
-    	syscall 4 # PrintString
-    	exit 1
+    .data
+        str: .asciz %str
+    .text
+        newstr
+        la a0, str
+        syscall 4 # PrintString
+        exit 1
 .end_macro
 
 .macro push %r
@@ -40,189 +55,181 @@
     addi sp, sp, 8
 .end_macro
 
-.macro printch 
-    syscall 11
+.macro swap %r1, %r2
+    xor %r1, %r1, %r2
+    xor %r2, %r2, %r1
+    xor %r1, %r1, %r2
 .end_macro
 
-.macro readch
-    syscall 12
+## checking a character in a given range. r1 -- output(bool); r2 -- input;
+.macro check %r1, %r2, %start, %end
+    andi %r1, %r2, 0xff
+    addi %r1, %r1, -%start
+    sltiu %r1, %r1, %end
 .end_macro
 
-.macro check_start %n %p
-	push ra
-	li a1, %n
-	li a2, %p
-	call check
-	pop ra
+## r1 <== (r3 << offset) + (r2 - start + value); the values of registers r2 and r3 do not change.
+.macro append %r1, %r2, %r3, %start, %value, %offset
+        push  %r3
+
+        addi  %r1, %r2, -%start
+        addi  %r1, %r1, %value
+        slli  %r3, %r3, %offset
+        add   %r1, %r3, %r1
+
+        pop   %r3
 .end_macro
 
-.macro body_start %d %p %k
-	push ra
-	li a1, %d
-	li a2, %p
-	li a3, %k
-	call body
-	pop ra
-.end_macro
 
-.macro one
-	push a0
-    check_start '+', 1
-    beq a0, zero, .end
-
-    add t0, t5, t6
-    .end:
-       pop a0
-.end_macro
-
-.macro two
-	push a0
-    check_start '-', 1
-    beq a0, zero, .end
-    sub t0, t5, t6
-    .end:
-       pop a0
-.end_macro
-
-.macro three
-	push a0
-    check_start '&', 1
-    beq a0, zero, .end
-    and t0, t5, t6
-    .end:
-       pop a0
-.end_macro
-
-.macro four
-	push a0
-    check_start '|', 1
-    beq a0, zero, .end
-    or t0, t5, t6
-    .end:
-       pop a0
-.end_macro
-
-  
 .text
-main:
-   call scan
-   mv t5, a0
-   call scan
-   mv t6, a0
-   readch
-   
-   one    # check +
-   two    # check -
-   three  # check &
-   four   # check |
-   
-   mv a0, t0
-   call write
-   exit 0
+.main:
+    push s0
 
-  
-newstr: # Print char \n. Using s1 and a0 registers.
-	push s1
-    mv s1, a0
-    li a0, '\n'
-    printch
-    mv a0, s1
-    pop s1
-    ret
+    call ReadHex
+    mv s0, a0
+    call ReadHex
+
+    mv a1, a0
+    mv a0, s0
+    call OperHex
+    call PrintHex
+
+    pop s0
+    exit 0
 
 
-check: # %n %p
-    andi a0, a0, 0xff
-    sub a0, a0, a1
-    sltu a0, a0, a2
-	ret
+ReadHex:
+    push2 ra, s0
+    push2 s1, s2
+    push2 s3, s4
 
+    li s0, 8  # counter (8 digits + 1 '\n')
+    li s1, '\n'
+    li s4, 0  # result
 
-body: # %n %p %k %res
-	push2 ra, s1
-	mv s1, a0
-    call check # %n, %p
-    beq a0, zero, .end
-    
-    sub a0, s1, a1
-    add a0, a0, a3
-    slli a4, a4, 4
-    add a0, a4, a0
-    mv a4, a0
-    mv s1, a0
-    
-    .end:
-    	mv a0, s1
-        pop2 ra, s1
-        ret
-
-
-scan:
-	push2 a4, s1
-	push2 s2, s3
-    li a4, 268435456 # result
-    li s1, 8  # counter
-    li s2, '\n'
-    readch
-    beq a0, s2, .err3
-    
-    .start:
-		mv s3, a4
-       	body_start '0', 10, 0
-       	body_start 'A', 6, 10
-       	body_start 'a', 6, 10
-
-       	beq a4, s3, .err1
-       	beq s1, zero, .err2
-       	addi s1, s1, -1
+    .while_read:
         readch
-        bne a0, s2, .start
-    
-    mv a0, a4    
-    pop2 s2, s3
-    pop2 a4, s1
-    ret
-    .err1:
-    	error "error: the entered character is not included in the 16-bit system!"
-	.err2:
-		error "error: limit characters!"
-	.err3:
-		error "error: empty input!"
+        beq a0, s1, .break
+        beq s0, zero, .error_limit
 
-  
-write:
-	push ra
-	push2 s1, s2
-    call newstr
-    
-    mv s1, a0
-    li s2, 8 # counter
-    beq s1, zero, .end_func
+        check s2, a0, '0', 10
+        bnez s2, .digit
 
-    .prep:
-       srli a0, s1, 28
-       addi s2, s2, -1
-       slli s1, s1, 4
-       beq a0, zero, .prep  
-    
-    .start_while:
-       li a4, 0
-       body_start 0, 10, '0'
-       body_start 0, 16, 55 # 'A'-10
-       printch
-       srli a0, s1, 28
-       addi s2, s2, -1
-       slli s1, s1, 4
-       bge s2, zero, .start_while
-    
-    pop2 s1, s2
-    pop ra
-    ret
-    
-    .end_func:
-    	li a0, '0'
-        printch
+        check s2, a0, 'A', 6
+        bnez s2, .big_char
+
+        check s2, a0, 'a', 6
+        beqz s2, .error_char
+
+        append s2, a0, s4, 'a', 10, 4
+        j .skip
+
+        .big_char:
+            append s2, a0, s4, 'A', 10, 4
+        j .skip
+
+        .digit:
+            append s2, a0, s4, '0', 0, 4
+
+        .skip:
+        mv s4, s2
+        addi s0, s0, -1
+        bgez s0, .while_read
+
+    .break:
+        mv a0, s4
+        pop2 s3, s4
         pop2 s1, s2
-        pop ra
-		ret
+        pop2 ra, s0
+        ret
+    .error_limit:
+        error "error: limit characters!"
+    .error_char:
+        error "error: the entered character is not a 16-digit number!"
 
+
+OperHex:
+    push2 s0, ra
+    mv s0, a0
+
+    readch
+    check t0, a0, '+', 1
+    bnez t0, .summa
+
+    check t0, a0, '-', 1
+    bnez t0, .difference
+
+    check t0, a0, '&', 1
+    bnez t0, .bitAND
+
+    check t0, a0, '|', 1
+    bnez t0, .error_oper
+
+    .bitOR:
+        or a0, s0, a1
+        j .tail
+
+    .bitAND:
+        and a0, s0, a1
+        j .tail
+
+    .difference:
+        sub a0, s0, a1
+        j .tail
+
+    .summa:
+        add a0, s0, a1
+
+    .tail:
+        pop2, s0, ra
+        ret
+    .error_oper:
+        error "the entered character is not from this set -- {+, -, &, |}!"
+
+
+PrintHex:
+    beqz a0, .printZeroHex
+    mv a1, a0
+    newstr
+
+    push2  ra, s0
+    push2 s1, s2
+
+    li s0, 32            # counter
+    li s1, 0xf0000000   # mask
+
+    .cycle:  # clipping non-essential zeros
+        srli s1, s1,  4
+        addi s0, s0, -4
+        and  s2, a1, s1
+        beqz s2, .cycle
+
+    .while_print_hex:
+        addi s0, s0, -4
+        and  s2, a1, s1
+        srl  s2, s2, s0
+        srli s1, s1,  4
+
+        check t0, s2, 0, 10
+        bnez  t0, .pr_digit
+
+        check t0, s2, 0, 16
+
+        .pr_char:
+            addi  a0, s2, 87  # 87 == 'a' - 10
+            j .pr
+
+        .pr_digit:
+            addi a0, s2, '0'
+
+        .pr:
+            printch
+        bnez s0, .while_print_hex
+
+    pop2 s1, s2
+    pop2 ra, s0
+    ret
+    .printZeroHex:
+        li a0, '0'
+        printch
+        ret
