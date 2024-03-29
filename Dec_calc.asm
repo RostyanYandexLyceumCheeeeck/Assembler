@@ -1,4 +1,4 @@
-.include "hex_core.asm"
+.include "dec_core.asm"
 
 
 .text
@@ -6,18 +6,17 @@
 main:
     push s0
 
-    call ReadHex
+    call ReadDec
     mv s0, a0
-    call ReadHex
+    call ReadDec
 
     mv a1, a0
     readch
     mv a2, a0
     mv a0, s0
-    call OperHex
+    call OperDec
     newstr
-    call PrintHex
+    call PrintDec
 
     pop s0
     exit 0
-

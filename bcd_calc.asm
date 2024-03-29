@@ -1,74 +1,7 @@
-.macro syscall %n
-    li a7, %n # a7 holds syscall number
-    ecall
-.end_macro
-
-.macro exit %ecode
-    li a0, %ecode
-    syscall 93
-.end_macro
-
-.macro printch
-    syscall 11
-.end_macro
-
-.macro readch
-    syscall 12
-.end_macro
-
-.macro newstr # Print char \n. Using s1 and a0 registers.
-    push a0
-    li a0, '\n'
-    printch
-    pop a0
-.end_macro
-
-.macro error %str
-    .data
-        str: .asciz %str
-    .text
-        newstr
-        la a0, str
-        syscall 4 # PrintString
-        exit 1
-.end_macro
-
-.macro push %r
-    addi sp, sp, -4
-    sw %r, 0(sp)
-.end_macro
-
-.macro pop %r
-    lw %r, 0(sp)
-    addi sp, sp, 4
-.end_macro
-
-.macro push2 %r1, %r2
-    addi sp, sp, -8
-    sw %r1, 0(sp)
-    sw %r2, 4(sp)
-.end_macro
-
-.macro pop2 %r1, %r2
-    lw %r1, 0(sp)
-    lw %r2, 4(sp)
-    addi sp, sp, 8
-.end_macro
-
-.macro swap %r1, %r2
-    xor %r1, %r1, %r2
-    xor %r2, %r2, %r1
-    xor %r1, %r1, %r2
-.end_macro
-
-## checking a character in a given range. r1 -- output(bool); r2 -- input;
-.macro check %r1, %r2, %start, %end
-    andi %r1, %r2, 0xff
-    addi %r1, %r1, -%start
-    sltiu %r1, %r1, %end
-.end_macro
+.include "hex_core.asm"
 
 .text
+.globl main
 main:
     push s1
     call readNumBCD
@@ -78,30 +11,21 @@ main:
     mv a1, a0
     mv a0, s1
     call oper
-
+    
+    newstr
     call printBCDnumber
 
     pop s1
     exit 0
 
 
-checkSignMinus: # return a0/a1 = 1/11 if '-' else 0/10
+checkSignMinusBCD: # return a0/a1 = 1/11 if '-' else 0/10
     li a1, 10
     check a0, a0, '-', 1
-    beqz a0, .end
+    beqz a0, .end_check_sign
     li a1, 11
-    .end:
+    .end_check_sign:
         ret
-
-
-getDigitBCD:
-    check t0, a0, '0', 10
-    beqz t0, .err_digit
-
-    addi a0, a0, -48  # -'0'
-    ret
-    .err_digit:
-        error "error: the entered character is not a digit!"
 
 
 readNumBCD:
@@ -115,14 +39,14 @@ readNumBCD:
     beq a0, s5, .err_empty_input
 
     mv s1, a0
-    call checkSignMinus
+    call checkSignMinusBCD
     mv s3, a1  # save sign
     swap s1, a0
     beqz s1, .start  # if the entered character is a digit
     readch
 
     .start:
-        call getDigitBCD
+        call getDigit
         add s4, s4, a0
         slli s4, s4, 4
         addi s2, s2, -1
@@ -183,9 +107,9 @@ additionBCD: # sum(a0, a1): return a0 + a1
         j .end_add
     .summary:
         call algo_sum_bcd
-        ## 6168199
+        ## 6168199  
         ## 3034102
-        ## 91a22a1
+        ## 91a22a1     6168199 + 3034102 = 91a22a1
         ## незнаю, как написать, но приведу пример, мб понятно буит)) 91a22a1 --> 9202301
         srli a0, a0, 4
         mv a1, zero
@@ -216,8 +140,8 @@ algo_sum_bcd:
              slli t0, t0, 4
              addi t1, t1, -1
              slli t2, t2, 4
-            slli t5, t5, 4
-            blt zero, t1, .while_sum
+             slli t5, t5, 4
+             blt zero, t1, .while_sum
     add a0, a0, a1
 
     ## overflow [-9 999 999; 9 999 999]
@@ -265,27 +189,24 @@ algo_sub_bcd:
 printBCDnumber:
     push s0
     mv s0, a0
-    newstr
 
     andi t5, s0, 15  # check sign
 
     srli s0, s0, 4
     beqz s0, .printZero
     # print sign(if '-')
-    li t0, 10
-    beq t5, t0, .skip_sign
-    li a0, '-'
-    printch
+    beqi t5, 10, .skip_sign
+    printchi '-'
 
     .skip_sign:
     li t0, 0xf0000000 # mask
     li t1, 32         # counter
 
-    .cycle:  # clipping non-essential zeros
+    .cycleBCD:  # clipping non-essential zeros
         srli t0, t0, 4
         addi t1, t1, -4
         and a0, s0, t0
-        beqz a0, .cycle
+        beqz a0, .cycleBCD
 
     .print_cycle:  # print BCD number
         addi t1, t1, -4
@@ -298,8 +219,7 @@ printBCDnumber:
 
     j .end_print_BCD_Number
     .printZero:
-        li a0, '0'
-        printch
+        printchi '0'
     .end_print_BCD_Number:
         pop s0
         ret
