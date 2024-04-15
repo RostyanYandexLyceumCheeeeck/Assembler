@@ -61,83 +61,83 @@ Mod10:
 
 
 udiv:
-	push2 ra, s0
-	push2 s1, s2
-	mv   s0, a0  # res
-	li   s1,  0  # ost
-	
-	beqz a1, .err_udiv
-	beqi a1, 1, .end_udiv
-	li   s0, 0
-	beqz a0, .end_udiv
-	
-	mv   s1, a0
-	bltu a0, a1, .end_udiv
+    push2 ra, s0
+    push2 s1, s2
+    mv   s0, a0  # res
+    li   s1,  0  # ost
+    
+    beqz a1, .err_udiv
+    beqi a1, 1, .end_udiv
+    li   s0, 0
+    beqz a0, .end_udiv
+    
+    mv   s1, a0
+    bltu a0, a1, .end_udiv
 
-	li   s2, 0  # count bits in a0
-	.while_count_udiv:
-		addi s2, s2, 1
-		srli s1, s1, 1
-		bnez s1, .while_count_udiv
-	li t0, 32
-	sub t0, t0, s2
-	sll  a0, a0, t0
-	
-	addi t1, a1, -1
-	.while_s2_udiv:
-		srli t3, a0, 31  # bit sign
-		slli s1, s1, 1
-		add  s1, s1, t3
-		
-		sltu t0, t1, s1  # (a1 - 1) < ost
-		slli s0, s0, 1
-		add  s0, s0, t0
-		
-		beqz t0, .skip_udiv
-		sub s1, s1, a1
-		.skip_udiv:
-		slli a0, a0, 1
-		addi s2, s2, -1
-		bnez s2, .while_s2_udiv
-	
-	.end_udiv:
-	mv   a0, s0
-	mv   a1, s1
-	pop2 s1, s2
-	pop2 ra, s0
-	ret
-	.err_udiv:
-		error "ZeroDivisionError: division by zero!"
+    li   s2, 0  # count bits in a0
+    .while_count_udiv:
+        addi s2, s2, 1
+        srli s1, s1, 1
+        bnez s1, .while_count_udiv
+    li t0, 32
+    sub t0, t0, s2
+    sll  a0, a0, t0
+    
+    addi t1, a1, -1
+    .while_s2_udiv:
+        srli t3, a0, 31  # bit sign
+        slli s1, s1, 1
+        add  s1, s1, t3
+        
+        sltu t0, t1, s1  # (a1 - 1) < ost
+        slli s0, s0, 1
+        add  s0, s0, t0
+        
+        beqz t0, .skip_udiv
+        sub s1, s1, a1
+        .skip_udiv:
+        slli a0, a0, 1
+        addi s2, s2, -1
+        bnez s2, .while_s2_udiv
+    
+    .end_udiv:
+    mv   a0, s0
+    mv   a1, s1
+    pop2 s1, s2
+    pop2 ra, s0
+    ret
+    .err_udiv:
+        error "ZeroDivisionError: division by zero!"
 
 
 sdiv:
-	push2 ra, s0
-	push  s1
-	
-	xor s0, a0, a1
-	srli s0, s0, 31  # sign res
-	srli s1, a0, 31  # sign fn
-	
-	bgez a0, .skip_neg_fn
-		neg a0, a0
-	.skip_neg_fn:
-	
-	bgez a1, .skip_neg_sn
-		neg a1, a1
-	.skip_neg_sn:
-	
-	call udiv
-	beqz s1, .skip_neg_ost
-		neg a1, a1
-	.skip_neg_ost:
-	
-	beqz s0, .end_sdiv
-		neg a0, a0
-	
-	.end_sdiv:
-	pop  s1
-	pop2 ra, s0
-	ret
+    push2 ra, s0
+    push  s1
+    
+    xor s0, a0, a1
+    srli s0, s0, 31  # sign res
+    srli s1, a0, 31  # sign fn
+    
+    bgez a0, .skip_neg_fn
+        neg a0, a0
+    .skip_neg_fn:
+    
+    bgez a1, .skip_neg_sn
+        neg a1, a1
+    .skip_neg_sn:
+    
+    call udiv
+    beqz s1, .skip_neg_ost
+        neg a1, a1
+    .skip_neg_ost:
+    
+    beqz s0, .end_sdiv
+        neg a0, a0
+    
+    .end_sdiv:
+    pop  s1
+    pop2 ra, s0
+    ret
 
 
 # input: a0 -- fn; a1 -- sn; a2 -- char operation
