@@ -1,4 +1,4 @@
-.include "dec_core.asm"
+.include "./cores/dec_core.asm"
 
 .text
 .globl main
