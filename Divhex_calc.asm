@@ -1,4 +1,4 @@
-.include "./cores/hex_core.asm"
+.include "./cores/all_cores.asm"
 
 
 .text

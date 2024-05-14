@@ -1,0 +1,5 @@
+.include "core.asm"
+.include "hex_core.asm"
+.include "dec_core.asm"
+.include "file_core.asm"
+.include "str_core.asm"

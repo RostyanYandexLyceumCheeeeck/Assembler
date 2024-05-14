@@ -1,4 +1,4 @@
-.include "core.asm"
+# .include "core.asm"
 
 ## r1 <== (r3 << offset) + (r2 - start + value); the values of registers r2 and r3 do not change.
 .macro append %r1, %r2, %r3, %start, %value, %offset
@@ -18,7 +18,7 @@
     call MultiHex
 .end_macro
 
-.macro MultiHexsrr %rs, %r1, %r2  # r -- register. s -- save. rs == register saved.
+.macro MultiHexsrr %rs, %r1, %r2  # r -- register. s -- register result. rs == register saved.
     Multihexrr %r1, %r2
     mv %rs, a0
 .end_macro
