@@ -1,5 +1,6 @@
 # .include "core.asm"
 # .include "hex_core.asm"
+.eqv ln_C 256
 
 
 # input:  a0 -- address memory(str); a1 -- sumbol
@@ -287,3 +288,158 @@ StrLower:
     mv   a0, t4
     ret
 
+
+# input:  a0 -- address matrixlines; a1 -- len matrixlines
+# output: a0 -- address matrixlines (the address of the matrix has not changed) [ MSDRadixSort eq matrixlines.sorted() in Python ]
+MSDRadixSort:
+    push2 ra, s0
+    push2 s1, s2
+    push2 s3, s4
+    
+    mv   s0, a0  # address matrixlines
+    mv   s1, a1  # len matrixlines
+    addi s2, sp, -4
+    
+    calloc_stack ln_C   # C = [0, 0, ..., 0] array-counter on stack; ln_C = 256
+    addi s3, sp, -4
+    
+    slli t2, s1, 2
+    add  t0, a0, t2      # end matrixlines
+    .loop_MSDRadixSort:  # push matrixlines on stack
+        lw   t1, 0(a0)
+        push t1
+        addi a0, a0, 4
+        blt  a0, t0, .loop_MSDRadixSort
+    mv   s4, sp
+    
+    mv   a0, s3
+    mv   a1, s1
+    li   a2,  0
+    mv   a3, s2
+    call MSD_RS_rec
+    
+    mv   sp, s4
+    addi t1, s1, -1
+    slli t2, t1, 2
+    add  t0, s0, t2       # end matrixlines
+    .while_MSDRadixSort:  # pop matrixlines from stack
+        pop  t1
+        sw   t1, 0(t0)
+        addi t0, t0, -4
+        bge  t0, s0, .while_MSDRadixSort
+    
+    addi sp, s2, 4
+    .end_MSDRadixSort:
+    mv   a0, s0
+    pop2 s3, s4
+    pop2 s1, s2
+    pop2 ra, s0    
+    ret
+
+
+# input:  a0 -- address start arr A on stack; a1 -- len arr A on stack; a2 -- index char in strings; a3 -- stack pointer to array-counter C
+MSD_RS_rec:
+    push2 ra, s0
+    push2 s1, s2
+    push2 s3, s4
+    push2 s5, s6
+    
+    blti a1, 2, .pop_end_MSD_RS_rec
+    
+    mv   s0, a0
+    mv   s1, a1
+    mv   s2, a2
+    mv   s3, a3       # save start array-counter C
+    
+    addi s4, sp, -4   # save start copy_C on stack
+    calloc_stack ln_C # copy C on stack
+    mv   s5, sp          # save end copy_C
+
+    addi sp, s3, 4
+    calloc_stack ln_C # C = [0, 0, ..., 0]
+    
+    mv   t4, s5
+    slli t0, s1, 2
+    sub  t5, s0, t0      # end arr on stack
+    .loop_MSD_RS_rec:   
+        lw   t0, 0(a0)   # address string
+        add  t1, t0, a2
+        lb   t1, 0(t1)   # char
+
+        mv   sp, t4
+        push t0          # copy address string
+
+        slli t1, t1, 2
+        sub  sp, s3, t1
+        pop  t3
+        addi t3, t3, 1  # C[char] += 1
+        push t3
+        
+        addi t4, t4, -4
+        addi a0, a0, -4
+        bgt  a0, t5, .loop_MSD_RS_rec
+    mv   s6, t4  # save address end copy _matrixlines on stack
+    
+    addi sp, s4, 4
+    li   t4, 4            # i
+    lw   t0, 0(s3)      # C[0]
+    .while_MSD_RS_rec:
+        sub  t3, s3, t4
+        lw   t1, 0(t3)  # C[i]
+        add  t2, t0, t1
+        sw   t2, 0(t3)
+        push t2
+        mv   t0, t2
+        
+        addi t4, t4, 4
+        bgt  sp, s5, .while_MSD_RS_rec
+    
+    mv   sp, s6
+    .cycle_MSD_RS_rec:
+        pop  t0           # address string
+        add  t1, t0, a2
+        lb   t1, 0(t1)   # char
+        
+        slli t1, t1, 2
+        sub  t2, s3, t1  # address C[char]
+        lw   t3, 0(t2)   # C[char]
+        
+        addi t3, t3, -1
+        sw   t3, 0(t2)   # C[char] -= 1
+        slli t3, t3, 2
+        sub  t2, s0, t3  # address A[C[char]]
+        sw   t0, 0(t2)   # A[C[char]] = address string
+        blt  sp, s5, .cycle_MSD_RS_rec
+
+    lw   t0, 0(s4)
+    beq  t0, s1, .end_MSD_RS_rec
+    
+    addi s6, s4, -4
+    .new_cycle_MSD_RS_rec:
+        lw   t0, 0(s6)    # copy_C[i]
+        blei t0, 1, .continue_new_cycle_MSD_RS_rec
+        lw   t1, 4(s6)    # copy_C[i - 1]
+        sub  t2, t0, t1   # C[i] - C[i-1]
+        
+        blei t2, 1, .continue_new_cycle_MSD_RS_rec
+        # else:
+            slli t1, t1, 2
+            sub  a0, s0, t1
+            mv   a1, t2
+            addi a2, s2, 1
+            mv   a3, s3
+            mv   sp, s5
+            call MSD_RS_rec
+        
+        .continue_new_cycle_MSD_RS_rec:
+        addi s6, s6, -4
+        blt  s5, s6, .new_cycle_MSD_RS_rec
+    
+    .end_MSD_RS_rec:
+    addi sp, s4, 4
+    .pop_end_MSD_RS_rec:
+    pop2 s5, s6
+    pop2 s3, s4
+    pop2 s1, s2
+    pop2 ra, s0    
+    ret

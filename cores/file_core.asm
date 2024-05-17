@@ -10,7 +10,7 @@
 
 .macro closer %r
     mv a0, %r
-    syscall 57
+    close
 .end_macro
 
 .macro lseek

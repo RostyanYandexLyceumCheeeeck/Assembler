@@ -176,3 +176,11 @@
     mv  %rd, %r2
     .end_max:
 .end_macro
+
+.macro calloc_stack %n
+    li   tr, %n
+    .calloc_stack:  
+        push zero
+        addi tr, tr, -1
+        bgtz tr, .calloc_stack
+.end_macro
