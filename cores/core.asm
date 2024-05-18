@@ -55,6 +55,11 @@
     printint
 .end_macro
 
+.macro printinta %a
+    lw a0, %a
+    printint
+.end_macro
+
 .macro printintis %n
     push a0
     printinti %n
@@ -76,14 +81,27 @@
     syscall 4
 .end_macro
 
-.macro error %str
+.macro printstrr %r
+    mv   a0, %r
+    printstr
+.end_macro
+
+.macro printstra %a
+    la   a0, %a
+    printstr
+.end_macro
+
+.macro printstri %str
     .data
-        str: .asciz %str
+    str_i: .asciz %str
     .text
-        newstr
-        la a0, str
-        printstr # PrintString
-        exit 1
+    printstra str_i
+.end_macro
+
+.macro error %str
+    newstr
+    printstri %str
+    exit 1
 .end_macro
 
 .macro push %r
@@ -154,6 +172,41 @@
     bleu %r, tr, %label
 .end_macro
 
+.macro jalra %a
+    lw   tr, %a
+    jalr tr
+.end_macro
+
+.macro adda %rd, %r, %a
+    lw   tr, %a
+    add  %rd, %r, tr
+.end_macro
+
+.macro addia %rd, %a, %n
+    lw   tr, %a
+    addi %rd, tr, %n
+.end_macro
+
+.macro aadda  %a1, %r, %a2
+    adda tr, %r, %a2
+    sw   tr, %a1, t5
+.end_macro
+
+.macro aaddia %a1, %a2, %n
+    addia tr, %a2, %n
+    sw    tr, %a1, t5
+.end_macro
+
+.macro suba %r, %d, %a
+    lw  tr, %a
+    sub %r, %d, tr
+.end_macro
+
+.macro subaa %rd, %a1, %a2
+    lw   %rd, %a1
+    suba %rd, %rd, %a2
+.end_macro
+
 ## checking a character in a given range. rd -- output(bool); r1 -- input;
 .macro check %rd, %r1, %start, %len
     andi %rd, %r1, 0xff
@@ -179,8 +232,8 @@
 
 .macro calloc_stack %n
     li   tr, %n
-    .calloc_stack:  
+    .calloc_stack_loop:  
         push zero
         addi tr, tr, -1
-        bgtz tr, .calloc_stack
+        bgtz tr, .calloc_stack_loop
 .end_macro

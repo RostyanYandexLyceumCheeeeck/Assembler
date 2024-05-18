@@ -32,18 +32,31 @@ strstr:
     
     mv   s0, a0
     mv   s1, a1
-    
+    li   a0, 0
     .loop_strstr:
         lb   t0, 0(s0)
         lb   t1, 0(s1)
         beqz t1, .end_strstr
-        beq  t0, t1, .continue_strstr
+        beq  t0, t1, .upd_a0_strstr
         
-        mv   a0, s0
-        mv   s1, a1
-        lb   t1, 0(s1)
-        beq  t0, t1, .loop_strstr
+        # mv   a0, s0
+        # mv   s1, a1
+        # lb   t1, 0(s1)
+        # beq  t0, t1, .loop_strstr
+        # li   a0, 0
+                
         li   a0, 0
+        sub  t0, s1, a1
+        sub  s0, s0, t0
+        lb   t0, 0(s0)
+        
+        mv   s1, a1
+        addi s1, s1, -1
+        j   .continue_strstr
+        
+        .upd_a0_strstr:
+        bnez a0, .continue_strstr
+        mv   a0, s0
         
         .continue_strstr:
         addi s0, s0, 1
