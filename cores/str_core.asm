@@ -186,7 +186,7 @@ strncpy:
         sb   t0, 0(a0)
         addi a0, a0, 1
         
-        beqi t0, '\0', .skip_new_char_strncpy
+        beqz t0, .skip_new_char_strncpy
         addi a1, a1, 1
         
         .skip_new_char_strncpy:
@@ -299,6 +299,60 @@ StrLower:
         addi a0, a0, 1
         bnez t0, .loop_StrLower
     mv   a0, t4
+    ret
+
+
+# input:  a0 -- address z-t str
+# output: a0 -- len str
+strlen:
+    mv   t0, a0
+    lb   t1, 0(t0)
+    beqz t1, .end_strlen
+    .while_strlen:
+        addi t0, t0, 1
+        lb   t1, 0(t0)
+        bnez t1, .while_strlen
+    
+    .end_strlen:
+    sub  a0, t0, a0
+    ret
+
+
+# concatenation of two strings
+# input:  a0 -- address first z-t str; a1 -- address second z-t str
+# output: a0 -- address new z-t str
+StrConc:
+    push2 ra, s0
+    push2 s1, s2
+    push2 s3, s4
+    
+    mv   s0, a0    # save address
+    mv   s1, a1    # save address
+    
+    call strlen
+    mv   s2, a0    # len first str
+    mv   a0, s1
+    call strlen
+    addi a0, a0, 1 # + '\0'
+    mv   s3, a0    # len second str
+    
+    add  a0, a0, s2
+    sbrk
+    mv   s4, a0    # addresss new str
+    
+    mv   a1, s0
+    mv   a2, s2
+    call strncpy
+    
+    add  a0, s4, s2
+    mv   a1, s1
+    mv   a2, s3
+    call strncpy
+    
+    mv   a0, s4
+    pop2 s3, s4
+    pop2 s1, s2
+    pop2 ra, s0
     ret
 
 
